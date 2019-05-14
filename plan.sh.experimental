@@ -1,0 +1,68 @@
+pkg_origin=bixu
+pkg_name=lapack
+pkg_version="3.8.0"
+pkg_license=("Lapack")
+pkg_source="https://www.netlib.org/${pkg_name}/${pkg_name}-${pkg_version}.tar.gz"
+pkg_shasum="deb22cc4a6120bff72621155a9917f485f96ef8319ac074a7afbc68aab88bcf6"
+pkg_lib_dirs=("lib")
+pkg_deps=(
+  "core/doxygen"
+  "core/gcc"
+  "core/cmake"
+  "core/make"
+  "core/python"
+  "core/glibc"
+)
+
+do_setup_environment() {
+  set_buildtime_env LIBRARY_PATH "$(hab pkg path core/glibc)/lib"
+  return $?
+}
+
+do_prepare() {
+  install -d build
+}
+
+do_build() {
+  cd build
+  cmake /hab/cache/src/$pkg_dirname \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_SKIP_RPATH=ON \
+    -DBUILD_SHARED_LIBS=ON \
+    -DBUILD_TESTING=OFF \
+    -DCMAKE_INSTALL_PREFIX=/ \
+    -DCMAKE_Fortran_COMPILER=gfortran \
+    -DLAPACKE_WITH_TMG=ON \
+    -DCBLAS=ON \
+    -DBUILD_DEPRECATED=ON
+  make
+
+  cd ../
+  doxygen DOCS/Doxyfile_man  
+  return $?
+}
+
+do_install() {
+  cd build
+  attach
+  make DESTDIR="$pkg_prefix" install
+  
+  cd BLAS
+  attach
+  make DESTDIR="$pkg_prefix" install
+  install -m755 -d "$pkg_prefix/share/licenses/blas"
+  install -m644 "../../LICENSE.blas" "$pkg_prefix/share/licenses/blas/"
+
+  cd ../CBLAS
+  attach
+  make DESTDIR="$pkg_prefix" install
+
+  cd ../LAPACKE
+  attach
+  make DESTDIR="$pkg_prefix" install
+
+  # rm -r "$pkg_prefix"/lib/{libblas.*,libcblas.*,liblapacke.*}
+  # rm -r "$pkg_prefix"/lib/pkgconfig/{blas.*,cblas.*,lapacke.*}
+  # rm -r "$pkg_prefix"/lib/cmake/{cblas*,lapacke*}
+  return $?
+}
